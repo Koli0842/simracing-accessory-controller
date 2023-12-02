@@ -1,0 +1,6 @@
+{
+    "programmer": "Arduino as ISP",
+    "board": "arduino:avr:micro",
+    "port": "COM3",
+    "sketch": "handbrake.ino"
+}

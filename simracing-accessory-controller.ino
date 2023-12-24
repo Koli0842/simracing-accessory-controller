@@ -1,10 +1,12 @@
 #include "Joystick.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define HANDBRAKE_AXIS_MAX 1023
 #define HANDBRAKE_AXIS_TOP_TRESHOLD 1023
 #define HANDBRAKE_AXIS_BOTTOM_TRESHOLD 0
+#define HANDBRAKE_POLARITY true
+#define HANDBRAKE_GAMMA 1.6
 
 #define SHIFTER_AXIS_LEFT 400
 #define SHIFTER_AXIS_RIGHT 650
@@ -46,7 +48,8 @@ void setup() {
 }
 
 void loop() {
-    int handbrakeValue = processAxisValue(analogRead(PIN_HANDBRAKE));
+    int normalizedReading = normalizeReading(analogRead(PIN_HANDBRAKE));
+    int handbrakeValue = applyGammaFilter(normalizedReading);
     Joystick.setRxAxis(handbrakeValue);
 
     int shifterHorizontalValue = analogRead(PIN_G29_SHIFTER_X);
@@ -64,9 +67,18 @@ void loop() {
     }
 }
 
-int processAxisValue(int reading) {
-    int cappedReading = constrain(reading, HANDBRAKE_AXIS_BOTTOM_TRESHOLD, HANDBRAKE_AXIS_TOP_TRESHOLD);
-    return map(cappedReading, HANDBRAKE_AXIS_BOTTOM_TRESHOLD, HANDBRAKE_AXIS_TOP_TRESHOLD, HANDBRAKE_AXIS_MAX, 0);
+int applyGammaFilter(int reading) {
+    return pow(reading / (double)HANDBRAKE_AXIS_MAX, 1.0 / HANDBRAKE_GAMMA) * HANDBRAKE_AXIS_MAX;
+}
+
+int normalizeReading(int reading) {
+    int polarizedValue;
+    if (HANDBRAKE_POLARITY) {
+        polarizedValue = constrain(reading, HANDBRAKE_AXIS_BOTTOM_TRESHOLD, HANDBRAKE_AXIS_TOP_TRESHOLD);
+    } else {
+        polarizedValue = constrain(HANDBRAKE_AXIS_MAX - reading, HANDBRAKE_AXIS_MAX - HANDBRAKE_AXIS_TOP_TRESHOLD, HANDBRAKE_AXIS_MAX - HANDBRAKE_AXIS_BOTTOM_TRESHOLD);
+    }
+    return map(polarizedValue, HANDBRAKE_AXIS_BOTTOM_TRESHOLD, HANDBRAKE_AXIS_TOP_TRESHOLD, 0, HANDBRAKE_AXIS_MAX);
 }
 
 void setHandbrakeButton(int axisValue) {

@@ -1,10 +1,13 @@
 #include "Joystick.h"
 
-#define DEBUG 0
+#define HANDBRAKE true
+#define SHIFTER false
+#define DEBUG false
+#define DEBUG_HALL false
 
 #define HANDBRAKE_AXIS_MAX 1023
-#define HANDBRAKE_AXIS_TOP_TRESHOLD 1023
-#define HANDBRAKE_AXIS_BOTTOM_TRESHOLD 0
+#define HANDBRAKE_AXIS_TOP_TRESHOLD 700
+#define HANDBRAKE_AXIS_BOTTOM_TRESHOLD 550
 #define HANDBRAKE_POLARITY true
 #define HANDBRAKE_GAMMA 1.6
 
@@ -48,17 +51,26 @@ void setup() {
 }
 
 void loop() {
-    int normalizedReading = normalizeReading(analogRead(PIN_HANDBRAKE));
-    int handbrakeValue = applyGammaFilter(normalizedReading);
-    Joystick.setRxAxis(handbrakeValue);
+    int normalizedReading, handbrakeValue, shifterHorizontalValue, shifterVerticalValue;
+    bool shifterPressedDown;
+    Gear gear;
+    if (HANDBRAKE || DEBUG) {
+        normalizedReading = normalizeReading(analogRead(PIN_HANDBRAKE));
+        handbrakeValue = applyGammaFilter(normalizedReading);
+        Joystick.setRxAxis(handbrakeValue);
+    }
 
-    int shifterHorizontalValue = analogRead(PIN_G29_SHIFTER_X);
-    int shifterVerticalValue = analogRead(PIN_G29_SHIFTER_Y);
-    bool shifterPressedDown = digitalRead(PIN_G29_DOWN);
-    Gear gear = !shifterPressedDown ?
-        findGear(shifterHorizontalValue, shifterVerticalValue) :
-        findGearDown(shifterHorizontalValue, shifterVerticalValue);
-    updateShifter(gear);
+    if (SHIFTER || DEBUG) {
+        shifterHorizontalValue = analogRead(PIN_G29_SHIFTER_X);
+        shifterVerticalValue = analogRead(PIN_G29_SHIFTER_Y);
+        shifterPressedDown = digitalRead(PIN_G29_DOWN);
+        gear = !shifterPressedDown ?
+            findGear(shifterHorizontalValue, shifterVerticalValue) :
+            findGearDown(shifterHorizontalValue, shifterVerticalValue);
+        updateShifter(gear);
+    }
+
+    
     if (DEBUG) {
         char buffer[100];
         sprintf(buffer, "Handbrake [ %d ] Shifter [ %d | X %d Y %d PRESSED %x ]",
@@ -72,6 +84,11 @@ int applyGammaFilter(int reading) {
 }
 
 int normalizeReading(int reading) {
+    if (DEBUG_HALL) {
+        char buffer[100];
+        sprintf(buffer, "Handbrake [ %d ]", reading);
+        Serial.println(buffer);
+    }
     int polarizedValue;
     if (HANDBRAKE_POLARITY) {
         polarizedValue = constrain(reading, HANDBRAKE_AXIS_BOTTOM_TRESHOLD, HANDBRAKE_AXIS_TOP_TRESHOLD);

@@ -1,9 +1,10 @@
 #include "Joystick.h"
 
 #define HANDBRAKE true
-#define SHIFTER false
+#define SHIFTER true
 #define DEBUG false
 #define DEBUG_HALL false
+#define DEBUG_SHIFTER false
 
 #define HANDBRAKE_AXIS_MAX 1023
 #define HANDBRAKE_AXIS_TOP_TRESHOLD 700
@@ -79,11 +80,11 @@ void loop() {
     }
 }
 
-int applyGammaFilter(int reading) {
+int applyGammaFilter(const int& reading) {
     return pow(reading / (double)HANDBRAKE_AXIS_MAX, 1.0 / HANDBRAKE_GAMMA) * HANDBRAKE_AXIS_MAX;
 }
 
-int normalizeReading(int reading) {
+int normalizeReading(const int& reading) {
     if (DEBUG_HALL) {
         char buffer[100];
         sprintf(buffer, "Handbrake [ %d ]", reading);
@@ -98,7 +99,7 @@ int normalizeReading(int reading) {
     return map(polarizedValue, HANDBRAKE_AXIS_BOTTOM_TRESHOLD, HANDBRAKE_AXIS_TOP_TRESHOLD, 0, HANDBRAKE_AXIS_MAX);
 }
 
-void setHandbrakeButton(int axisValue) {
+void setHandbrakeButton(const int& axisValue) {
     if (axisValue > HANDBRAKE_AXIS_MAX/2) {
         Joystick.pressButton(0);
     } else {
@@ -106,11 +107,15 @@ void setHandbrakeButton(int axisValue) {
     }
 }
 
-void updateShifter(Gear gear) {
-    if (SELECTED_GEAR != gear) {
-        Joystick.releaseButton(SELECTED_GEAR);
+void updateShifter(const Gear& gear) {
+    if (gear == SELECTED_GEAR) return;
+    if (gear != Gear::NEUTRAL && SELECTED_GEAR != Gear::NEUTRAL) return; // Only allow gearshifts through neutral, fix twitchy sensors & overlap between gears
+
+    if (DEBUG_SHIFTER) {
+        char buffer[100];
+        sprintf(buffer, "Shifter [ %d ] -> [ %d ]", SELECTED_GEAR, gear);
+        Serial.println(buffer);
     }
-    SELECTED_GEAR = gear;
     
     switch (gear) {
     case Gear::FIRST:
@@ -134,33 +139,35 @@ void updateShifter(Gear gear) {
     case Gear::REVERSE:
         Joystick.pressButton(JOYSTICK_BUTTON_GR);
         break;
+    case Gear::NEUTRAL:
+        Joystick.releaseButton(SELECTED_GEAR);
+        break;
     }
+    SELECTED_GEAR = gear;
 }
 
-Gear findGear(int x, int y) {
+Gear findGear(const int& x, const int& y) {
+    if (y > SHIFTER_AXIS_TOP) {
     if (x < SHIFTER_AXIS_LEFT) {
-        if (y > SHIFTER_AXIS_TOP) {
             return Gear::FIRST;
-        } else if (y < SHIFTER_AXIS_BOTTOM) {
-            return Gear::SECOND;
-        }
-    } else if (x > SHIFTER_AXIS_RIGHT) {
-        if (y > SHIFTER_AXIS_TOP) {
+        } else if (x > SHIFTER_AXIS_RIGHT) {
             return Gear::FIFTH;
-        } else if (y < SHIFTER_AXIS_BOTTOM) {
-            return Gear::SIXTH;
-        }
-    } else {
-        if (y > SHIFTER_AXIS_TOP) {
+        } else {
             return Gear::THIRD;
+        }
         } else if (y < SHIFTER_AXIS_BOTTOM) {
+        if (x < SHIFTER_AXIS_LEFT) {
+            return Gear::SECOND;
+    } else if (x > SHIFTER_AXIS_RIGHT) {
+            return Gear::SIXTH;
+    } else {
             return Gear::FOURTH;
         }
     }
     return Gear::NEUTRAL;
 }
 
-Gear findGearDown(int x, int y) {
+Gear findGearDown(const int& x, const int& y) {
     if (x > SHIFTER_AXIS_RIGHT) {
         if (y < SHIFTER_AXIS_BOTTOM) {
             return Gear::REVERSE;
